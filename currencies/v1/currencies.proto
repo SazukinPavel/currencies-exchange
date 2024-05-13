@@ -1,0 +1,29 @@
+syntax = "proto3";
+
+package currencies.v1;
+option go_package = "currencies-exchange/gen/currencies/v1;currencies";
+
+service ExchangeService {
+  rpc Exchange(ExchangeRequest) returns (ExchangeResponse);
+}
+
+message ExchangeRequest {
+  string from = 1;
+  string to = 2;
+  float amount = 3;
+}
+
+message ExchangeResponse {
+  float result=1;
+}
+
+message Currency {
+  string code = 1;
+  string name = 2;
+}
+
+enum CurrencyStatus {
+  CURRENCY_STATUS_UNSPECIFIED=0;
+  CURRENCY_STATUS_DISABLE = 1; 
+  CURRENCY_STATUS_AVAILABLE = 2;
+}
