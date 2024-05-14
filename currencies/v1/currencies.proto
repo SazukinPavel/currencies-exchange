@@ -10,11 +10,11 @@ service ExchangeService {
 message ExchangeRequest {
   string from = 1;
   string to = 2;
-  float amount = 3;
+  double amount = 3;
 }
 
 message ExchangeResponse {
-  float result=1;
+  double result=1;
 }
 
 message Currency {
@@ -22,8 +22,15 @@ message Currency {
   string name = 2;
 }
 
-enum CurrencyStatus {
-  CURRENCY_STATUS_UNSPECIFIED=0;
-  CURRENCY_STATUS_DISABLE = 1; 
-  CURRENCY_STATUS_AVAILABLE = 2;
+message CurrencyRate {
+  string from = 1;
+  string to = 2;
+  double rate = 3;
+  CurrencyRateStatus status = 4;
+}
+
+enum CurrencyRateStatus {
+  CURRENCY_RATE_STATUS_UNSPECIFIED=0;
+  CURRENCY_RATE_STATUS_DISABLE = 1; 
+  CURRENCY_RATE_STATUS_AVAILABLE = 2;
 }
