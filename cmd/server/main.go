@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 	"net/http"
 
@@ -13,15 +14,105 @@ import (
 	"currencies-exchange/gen/currencies/v1/currenciesconnect"
 )
 
+var CurrencieRates = []currencies.CurrencyRate{
+	{
+		From:   "USD",
+		To:     "EUR",
+		Rate:   0.95,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+	{
+		From:   "EUR",
+		To:     "USD",
+		Rate:   1.05,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+	{
+		From:   "EUR",
+		To:     "BUN",
+		Rate:   3.2,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+	{
+		From:   "BUN",
+		To:     "EUR",
+		Rate:   0.32,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+	{
+		From:   "BUN",
+		To:     "USD",
+		Rate:   0.37,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+	{
+		From:   "USD",
+		To:     "BUN",
+		Rate:   3.1,
+		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
+	},
+}
+
+var Currencies = []currencies.Currency{
+	{
+		Code: "EUR",
+		Name: "Euro",
+	},
+	{
+		Code: "USD",
+		Name: "USA Dollar",
+	},
+	{
+		Code: "BUN",
+		Name: "Belarusian rubel",
+	},
+}
+
 type CurrenciesServer struct{}
 
 func (s *CurrenciesServer) Exchange(
 	ctx context.Context,
 	req *connect.Request[currencies.ExchangeRequest],
 ) (*connect.Response[currencies.ExchangeResponse], error) {
-	log.Println("Request headers: ", req.Header())
+	log.Println("From: ", req.Msg.From, "\tTo: ", req.Msg.To, "\tAmount: ", req.Msg.Amount)
+
+	var From *currencies.Currency
+	var To *currencies.Currency
+
+	for i := 0; i < len(Currencies); i++ {
+		if req.Msg.From == Currencies[i].Code {
+			From = &Currencies[i]
+		}
+		if req.Msg.To == Currencies[i].Code {
+			To = &Currencies[i]
+		}
+	}
+
+	var notExistCurrency string = ""
+	if To == nil {
+		notExistCurrency += req.Msg.To
+	}
+	if From == nil {
+		notExistCurrency += req.Msg.From
+	}
+
+	if len(notExistCurrency) > 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the currency you are requesting does not exist ("+notExistCurrency+")"))
+	}
+
+	var rate *currencies.CurrencyRate
+	for i := 0; i < len(CurrencieRates); i++ {
+		if CurrencieRates[i].Status == currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE && CurrencieRates[i].From == From.Code && CurrencieRates[i].To == To.Code {
+			rate = &CurrencieRates[i]
+		}
+	}
+
+	if rate == nil {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("currency exchange from "+From.Name+" to "+To.Name+" is temporarily unavailable"))
+	}
+
 	res := connect.NewResponse(&currencies.ExchangeResponse{
-		Result: 100,
+		Result: req.Msg.GetAmount() * rate.Rate,
 	})
 	res.Header().Set("Currencies-Version", "v1")
 	return res, nil
