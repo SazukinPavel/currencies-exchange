@@ -7,6 +7,8 @@ import (
 	"net/http"
 
 	"connectrpc.com/connect"
+	"github.com/joho/godotenv"
+
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -14,59 +16,14 @@ import (
 	"currencies-exchange/gen/currencies/v1/currenciesconnect"
 )
 
-var CurrencieRates = []currencies.CurrencyRate{
-	{
-		From:   "USD",
-		To:     "EUR",
-		Rate:   0.95,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-	{
-		From:   "EUR",
-		To:     "USD",
-		Rate:   1.05,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-	{
-		From:   "EUR",
-		To:     "BUN",
-		Rate:   3.2,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-	{
-		From:   "BUN",
-		To:     "EUR",
-		Rate:   0.32,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-	{
-		From:   "BUN",
-		To:     "USD",
-		Rate:   0.37,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-	{
-		From:   "USD",
-		To:     "BUN",
-		Rate:   3.1,
-		Status: currencies.CurrencyRateStatus_CURRENCY_RATE_STATUS_AVAILABLE,
-	},
-}
+var CurrencieRates = []currencies.CurrencyRate{}
 
-var Currencies = []currencies.Currency{
-	{
-		Code: "EUR",
-		Name: "Euro",
-	},
-	{
-		Code: "USD",
-		Name: "USA Dollar",
-	},
-	{
-		Code: "BUN",
-		Name: "Belarusian rubel",
-	},
-}
+var Currencies = []currencies.Currency{}
+
+var mongo_database *MongoDatabase
+
+var currency_collection *CurrencyCollection
+var rates_collection *RatesCollection
 
 type CurrenciesServer struct{}
 
@@ -118,10 +75,32 @@ func (s *CurrenciesServer) Exchange(
 	return res, nil
 }
 
+func init_currencies() {
+	for _, s := range currency_collection.get_all() {
+		Currencies = append(Currencies, *get_currency_from_mongo_currency(&s))
+	}
+
+	for _, s := range rates_collection.get_all() {
+		CurrencieRates = append(CurrencieRates, *get_rate_from_mongo_rate(&s))
+	}
+}
+
 func main() {
-	currenciesServer := &CurrenciesServer{}
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found")
+	}
+
+	mongo_database = new_mongo_database()
+	mongo_database.connect()
+
+	currency_collection = new_currency_collection(mongo_database)
+	rates_collection = new_rates_collection(mongo_database)
+
+	init_currencies()
+
+	currencies_server := &CurrenciesServer{}
 	mux := http.NewServeMux()
-	path, handler := currenciesconnect.NewExchangeServiceHandler(currenciesServer)
+	path, handler := currenciesconnect.NewExchangeServiceHandler(currencies_server)
 	mux.Handle(path, handler)
 	http.ListenAndServe(
 		"localhost:8080",
